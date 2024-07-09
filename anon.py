@@ -26,6 +26,7 @@ class PhoneNumberRecognizer:
             r'0\d{9}\b',  # National format without spaces
             r'0\d{2}[-\s]?\d{7}\b',  # National format with optional separator
             r'0\d{3}[-\s]?\d{6}\b',  # Another national format
+            r'\b\d{2}[-\s]?\d{2}[-\s]?\d{2}[-\s]?\d{2}[-\s]?\d{2}\b',  # Any 10 digit combination with optional separators
         ]
 
     def analyze(self, text: str) -> List[RecognizerResult]:
@@ -40,13 +41,27 @@ class PhoneNumberRecognizer:
                 ))
         return results
 
+class PostalCodeRecognizer:
+    def __init__(self):
+        self.name = "POSTAL_CODE"
+        self.pattern = re.compile(r'\b\d{4}\s?[A-Za-z]{2}\b|\b\d{4}-[A-Za-z]{2}\b')
+
+    def analyze(self, text: str) -> List[RecognizerResult]:
+        return [RecognizerResult(
+            entity_type=self.name,
+            start=match.start(),
+            end=match.end(),
+            score=0.85
+        ) for match in self.pattern.finditer(text)]
+
 class CustomAnalyzer:
     def __init__(self):
         self.recognizers = [
             CustomRecognizer("PERSON", r'\b(?!(?:Mijn|Je)\b)(?:[A-Z][a-z]+(?:\s+(?:van|de|der|den|van der|van de|van den))?\s+)*[A-Z][a-z]+\b'),
             CustomRecognizer("EMAIL_ADDRESS", r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'),
             CustomRecognizer("ADDRESS", r'\b[A-Z][a-z]+(?:straat|weg|laan|plein|singel|kade|gracht)\s+\d+[a-zA-Z]?\b'),
-            PhoneNumberRecognizer()
+            PhoneNumberRecognizer(),
+            PostalCodeRecognizer()
         ]
 
     def analyze(self, text: str) -> List[RecognizerResult]:
@@ -72,7 +87,8 @@ def anonymize_text(text: str) -> str:
         "PERSON": OperatorConfig("replace", {"new_value": "<PERSOON>"}),
         "EMAIL_ADDRESS": OperatorConfig("replace", {"new_value": "<E-MAIL>"}),
         "ADDRESS": OperatorConfig("replace", {"new_value": "<ADRES>"}),
-        "PHONE_NUMBER": OperatorConfig("replace", {"new_value": "<TELEFOON>"})
+        "PHONE_NUMBER": OperatorConfig("replace", {"new_value": "<TELEFOON>"}),
+        "POSTAL_CODE": OperatorConfig("replace", {"new_value": "<POSTCODE>"})
     }
 
     # Anonymize the text
@@ -92,6 +108,15 @@ sample_text = """
 Mijn naam is Jan de Vries en ik woon op Kalverstraat 123.
 Je kunt me bereiken op jan.devries@voorbeeld.nl of bel me op +31612345678.
 Mijn collega Piet van der Berg is bereikbaar op 0687654321.
+
+Jan Doedel,
+Godsweg 123
+5022GR
+6022 gr
+06-14436857
+06 12456798
+010-1234567
+010 2145678
 """
 
 anonymized_result = anonymize_text(sample_text)
